@@ -11,20 +11,10 @@ text {
 }
 
 .tick text {
-  font-size: 2em;
+  font-size: 1em;
   fill: #635F5D;
 }
 
 .tick line {
-  stroke: #C0C0BB;
-}
-
-.axis-label {
-  font-size: 3em;
-  fill: #8E8883;
-}
-
-.title {
-  font-size: 3em;
-  fill: #635F5D;
+  stroke: #FFFFFF;
 }

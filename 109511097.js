@@ -1,189 +1,232 @@
-var data;
+let data = []
+let schools = []
+let label = 'scores_overall'
+let strmap = {}
+let name2row = {}
+
+const toScore = (s) => {
+  return +s.split('–')[0];
+}
+
+function sort() {
+  data.sort((a, b) => {
+    return a[label] - b[label]
+  });
+  schools = []
+  data.forEach(d => schools.push(d['name']));
+}
 
 const svg = d3.select('svg');
 
-const classes = ['setosa', 'versicolor', 'virginica']
+const columns = ['scores_teaching', 'scores_research', 'scores_citations', 'scores_industry_income', 'scores_international_outlook']
+const weight = {
+  'scores_teaching': 0.3,
+  'scores_research': 0.3,
+  'scores_citations': 0.3,
+  'scores_industry_income': 0.025,
+  'scores_international_outlook': 0.075,
+}
+const columnShort = {
+  'scores_teaching': 'teaching',
+  'scores_research': 'research',
+  'scores_citations': 'citations',
+  'scores_industry_income': 'industry income',
+  'scores_international_outlook': 'international outlook',
+}
+
 const color = d3.scaleOrdinal()
-  .domain(classes)
-  .range(["red", "green", "blue"])
+  .domain(columns)
+  .range(["#E3BA22", "#E6842A", "#137B80", "#8E6C8A", "#BD2D28"])
 
-var xAxisLabel = $("input[name='x-axis']:checked").val()
-var yAxisLabel = $("input[name='y-axis']:checked").val()
+const tooltip = d3.select("#plot")
+  .append("div")
+  .style("opacity", 0)
+  .attr("class", "tooltip")
+  .style("background-color", "white")
+  .style("border", "solid")
+  .style("border-width", "1px")
+  .style("border-radius", "5px")
+  .style("padding", "10px")
+  .style('position', 'relative')
+  .style('width', 'auto');
 
-const mean = (values) => {
-  return (values.reduce((sum, current) => sum + current)) / values.length;
-}
-
-const variance = (values) => {
-  const avg = mean(values);
-  const squareDiffs = values.map((value) => {
-    const diff = value - avg;
-    return diff * diff;
-  });
-  return mean(squareDiffs);
-}
+svg.on('mousemove', function (d) {
+  tooltip
+    .style("left", (d3.mouse(svg.node())[0] + 50) + "px")
+    .style("top", (d3.mouse(svg.node())[1] - 50080) + "px")
+})
 
 const render = () => {
   svg.selectAll("*").remove();
 
   const plot = d3.select('#plot').node();
   const width = plot.getBoundingClientRect().width;
-  const height = 600;
+  const height = 50000;
 
-  const margin = { top: 60, right: 100, bottom: 80, left: 100 };
+  const margin = { top: 30, right: 150, bottom: 80, left: 250 };
   const innerWidth = width - margin.left - margin.right;
   const innerHeight = height - margin.top - margin.bottom;
 
-  const xValue = (d) => d[xAxisLabel];
-  const yValue = (d) => d[yAxisLabel];
-  const classValue = (d) => d.class;
-
-  const circleRadius = 10;
-
-  const title = `${xAxisLabel} vs. ${yAxisLabel}`
+  svg.append('rect')
+    .attr('id', 'background')
+    .attr('width', innerWidth)
+    .attr('height', innerHeight)
+    .attr('fill', '#EFECEA')
+    .attr('transform', `translate(${margin.left},${margin.top})`);
 
   const g = svg.append('g')
     .attr('transform', `translate(${margin.left},${margin.top})`);
 
-  g.append('text')
-    .text(title)
-    .attr('text-anchor', 'middle')
-    .attr('font-size', '2em')
-    .attr('transform', `translate(${innerWidth / 2}, -20)`);
-
   // x axis
   const xScale = d3.scaleLinear()
-    .domain(d3.extent(data, xValue))
+    .domain([0, 100])
     .range([0, innerWidth])
     .nice();
 
-  const xAxis = d3.axisBottom(xScale)
+  const xAxis = d3.axisTop(xScale)
     .tickSize(-innerHeight)
-    .tickPadding(15);
-
-  const xAxisG = g.append('g').call(xAxis)
-    .attr('transform', `translate(0,${innerHeight})`);
-  xAxisG.select('.domain').remove();
-  xAxisG.append('text')
-    .attr('class', 'axis-label')
-    .attr('y', 70)
-    .attr('x', innerWidth / 2)
-    .attr('fill', 'black')
-    .text(xAxisLabel);
-
-  // y axis
-  const yScale = d3.scaleLinear()
-    .domain(d3.extent(data, yValue))
-    .range([innerHeight, 0])
-    .nice();
-
-  const yAxis = d3.axisLeft(yScale)
-    .tickSize(-innerWidth)
     .tickPadding(10);
 
-  const yAxisG = g.append('g').call(yAxis);
-  yAxisG.selectAll('.domain').remove();
-  yAxisG.append('text')
-    .attr('class', 'axis-label')
-    .attr('y', -80)
-    .attr('x', -innerHeight / 2)
-    .attr('fill', 'black')
-    .attr('transform', `rotate(-90)`)
-    .attr('text-anchor', 'middle')
-    .text(yAxisLabel);
+  g.append('g')
+    .call(xAxis)
+    .selectAll('.domain')
+    .remove();
 
-  // data points
-  g.selectAll('circle').data(data)
-    .enter().append('circle')
-    .attr('cy', d => yScale(yValue(d)))
-    .attr('cx', d => xScale(xValue(d)))
-    .attr('r', circleRadius)
-    .attr('fill', d => color(classValue(d)))
-    .attr('opacity', 0.3)
-    .on('mouseover', function (d) {
-      const circleColor = d3.select(this).attr('fill');
-      d3.selectAll('circle')
-        .filter(function () {
-          return d3.select(this).attr('fill') == circleColor;
-        })
-        .attr('opacity', 0.8);
+  const rankScale = d3.scaleBand()
+    .range([0, innerHeight])
+    .domain(Array.from(Array(data.length).keys()))
+    .padding(0.05);
 
-      var x = [];
-      var y = [];
-      data.forEach(d => {
-        if (color(d.class) == circleColor) {
-          x.push(d[xAxisLabel]);
-          y.push(d[yAxisLabel]);
-        }
-      });
-      const statsG = g.append('g')
-        .attr('transform', `translate(${innerWidth - 250 - margin.right}, 20)`)
-        .attr('id', 'stats')
-        .attr('opacity', '0.8');
-      statsG.append('text')
-        .text(`mean(${xAxisLabel}): ${mean(x)}`);
-      statsG.append('text')
-        .attr('transform', `translate(0, 20)`)
-        .text(`variance(${xAxisLabel}): ${variance(x)}`);
-      statsG.append('text')
-        .attr('transform', `translate(0, 40)`)
-        .text(`mean(${yAxisLabel}): ${mean(y)}`);
-      statsG.append('text')
-        .attr('transform', `translate(0, 60)`)
-        .text(`variance(${yAxisLabel}): ${variance(y)}`);
-    })
-    .on('mouseleave', function (d) {
-      const c = d3.select(this).attr('fill');
-      d3.selectAll('circle')
-        .filter(function () {
-          return d3.select(this).attr('fill') == c;
-        })
-        .attr('opacity', 0.3);
-      d3.select('#stats').remove();
-    });
+  const rankAxis = g.append('g')
+    .attr('transform', `translate(${innerWidth},0)`)
+  rankAxis.call(d3.axisRight(rankScale).tickFormat(d => '# ' + (d + 1)))
+  rankAxis.selectAll('.domain').remove();
 
-  // legend
-  const legendG = g.append('g')
-    .attr('transform', `translate(20, 20)`);
-  for (let i = 0; i < classes.length; i++) {
-    legendG.append("circle")
-      .attr("cx", 0)
-      .attr("cy", i * 20)
-      .attr("r", 6)
-      .attr('opacity', 0.3)
-      .style("fill", color(classes[i]));
-    legendG.append("text")
-      .attr("x", 20)
-      .attr("y", i * 20)
-      .text(classes[i])
-      .style("font-size", "15px")
-      .attr("alignment-baseline", "middle");
+  const yScale = d3.scaleBand()
+    .range([innerHeight, 0])
+    .domain(schools)
+    .padding(0.05);
+
+  const yAxis = g.append('g')
+  yScale.domain(schools);
+  yAxis.transition()
+    .duration(1000)
+    .call(d3.axisLeft(yScale)
+      .tickFormat(d => strmap[d]));
+  yAxis.selectAll('.domain').remove();
+
+  const tooltipInfo = (name) => {
+    const d = name2row[name];
+    let info = d['name'] + '<br>';
+    info += 'overall：' + d['scores_overall'];
+    return info;
   }
 
+  yAxis.selectAll('text')
+    .on('mouseover', function (d) {
+      tooltip
+        .html(`${tooltipInfo(strmap[d3.select(this).text()])}`)
+        .style('opacity', 1)
+    })
+    .on('mouseleave', function (d) {
+      tooltip.style('opacity', 0)
+    })
+
+  const rectInfo = (name, field) => {
+    const d = name2row[name];
+    let info = d['name'] + '<br>';
+    info += columnShort[field] + '：' + d[field] + ' * ' + weight[field] + ' = ' + d[field] * weight[field];
+    return info;
+  }
+
+  function drawRect(xOffset, school, field) {
+    g.append('rect')
+      .attr('x', xOffset)
+      .attr('y', yScale(school['name']) + 5)
+      .attr('width', xScale(school[field]) * weight[field])
+      .attr('height', yScale.bandwidth() - 10)
+      .style('fill', color(field))
+      .on('mouseover', function (d) {
+        d3.select(this)
+          .raise()
+          .style('stroke', 'black')
+          .style('stroke-width', '2px')
+        tooltip
+          .html(`${rectInfo(school['name'], field)}`)
+          .style('opacity', 1)
+      })
+      .on('mouseleave', function (d) {
+        d3.select(this)
+          .style('opacity', 1)
+          .style('stroke', 'none')
+        tooltip.style('opacity', 0)
+      })
+
+    xOffset += xScale(school[field]) * weight[field]
+    return xOffset
+  }
+
+  for (i in data) {
+    let offset = 0;
+    for (j in columns) {
+      offset = drawRect(offset, data[i], columns[j])
+    }
+  }
+
+  function update() {
+    sort();
+    yScale.domain(schools);
+    yAxis.transition()
+      .duration(1000)
+      .call(d3.axisLeft(yScale)
+        .tickFormat(d => strmap[d]));
+    yAxis.selectAll('.domain').remove();
+
+    g.selectAll('rect').remove();
+
+    for (i in data) {
+      let offset = 0;
+      for (j in columns) {
+        offset = drawRect(offset, data[i], columns[j])
+      }
+    }
+
+  }
+
+  $("input[name='inlineRadioOptions']").click(function () {
+    label = $("input[name='inlineRadioOptions']:checked").val();
+    if (label != 'scores_overall') {
+      const idx = columns.indexOf(label);
+      const temp = columns[idx];
+      columns[idx] = columns[0];
+      columns[0] = temp;
+    }
+    update();
+  });
 };
 
 // load data
-d3.csv('http://vis.lab.djosix.com:2023/data/iris.csv')
+d3.csv('http://vis.lab.djosix.com:2023/data/TIMES_WorldUniversityRankings_2024.csv')
   .then(csv => {
-    data = csv.filter(d => {
-      if (d.class !== undefined) {
-        csv.columns.slice(0, -1).forEach((c) => {
-          d[c] = +d[c];
-        });
-        return d;
+    csv.forEach(row => {
+      if (row['rank'] == 'Reporter') return;
+      row['scores_overall'] = 0
+      columns.forEach(c => {
+        row[c] = +row[c];
+        row['scores_overall'] += row[c] * weight[c];
+      })
+      data.push(row);
+      if (row['name'].length > 30) {
+        strmap[row['name'].slice(0, 30) + '...'] = row['name'];
+        strmap[row['name']] = row['name'].slice(0, 30) + '...';
       }
-    });
+      else {
+        strmap[row['name']] = row['name'];
+      }
+      name2row[row['name']] = row;
+    })
+    sort();
     render();
   });
-
-$("input[name='x-axis']").click(function () {
-  xAxisLabel = $("input[name='x-axis']:checked").val();
-  render();
-});
-
-$("input[name='y-axis']").click(function () {
-  yAxisLabel = $("input[name='y-axis']:checked").val();
-  render();
-});
 
 window.onresize = () => { render() }
