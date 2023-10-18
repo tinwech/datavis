@@ -1,42 +1,13 @@
 let data = []
-let schools = []
-let label = 'scores_overall'
-let strmap = {}
-let name2row = {}
-
-const toScore = (s) => {
-  return +s.split('–')[0];
-}
-
-function sort() {
-  data.sort((a, b) => {
-    return a[label] - b[label]
-  });
-  schools = []
-  data.forEach(d => schools.push(d['name']));
-}
+let dates = []
+let obj = {}
+let key = 'house'
 
 const svg = d3.select('svg');
-
-const columns = ['scores_teaching', 'scores_research', 'scores_citations', 'scores_industry_income', 'scores_international_outlook']
-const weight = {
-  'scores_teaching': 0.3,
-  'scores_research': 0.3,
-  'scores_citations': 0.3,
-  'scores_industry_income': 0.025,
-  'scores_international_outlook': 0.075,
-}
-const columnShort = {
-  'scores_teaching': 'teaching',
-  'scores_research': 'research',
-  'scores_citations': 'citations',
-  'scores_industry_income': 'industry income',
-  'scores_international_outlook': 'international outlook',
-}
-
+const columns = ['house', 'unit', '1 bedrooms', '2 bedrooms', '3 bedrooms', '4 bedrooms', '5 bedrooms']
 const color = d3.scaleOrdinal()
   .domain(columns)
-  .range(["#E3BA22", "#E6842A", "#137B80", "#8E6C8A", "#BD2D28"])
+  .range(d3.schemePaired)
 
 const tooltip = d3.select("#plot")
   .append("div")
@@ -53,7 +24,7 @@ const tooltip = d3.select("#plot")
 svg.on('mousemove', function (d) {
   tooltip
     .style("left", (d3.mouse(svg.node())[0] + 50) + "px")
-    .style("top", (d3.mouse(svg.node())[1] - 50080) + "px")
+    .style("top", (d3.mouse(svg.node())[1] - 550) + "px")
 })
 
 const render = () => {
@@ -61,30 +32,29 @@ const render = () => {
 
   const plot = d3.select('#plot').node();
   const width = plot.getBoundingClientRect().width;
-  const height = 50000;
+  const height = 500;
 
-  const margin = { top: 30, right: 150, bottom: 80, left: 250 };
+  const margin = { top: 30, right: 200, bottom: 80, left: 150 };
   const innerWidth = width - margin.left - margin.right;
   const innerHeight = height - margin.top - margin.bottom;
-
-  svg.append('rect')
-    .attr('id', 'background')
-    .attr('width', innerWidth)
-    .attr('height', innerHeight)
-    .attr('fill', '#EFECEA')
-    .attr('transform', `translate(${margin.left},${margin.top})`);
 
   const g = svg.append('g')
     .attr('transform', `translate(${margin.left},${margin.top})`);
 
-  // x axis
-  const xScale = d3.scaleLinear()
-    .domain([0, 100])
-    .range([0, innerWidth])
-    .nice();
+  // background
+  g.append('rect')
+    .attr('id', 'background')
+    .attr('width', innerWidth)
+    .attr('height', innerHeight)
+    .attr('fill', '#EFECEA');
 
-  const xAxis = d3.axisTop(xScale)
-    .tickSize(-innerHeight)
+  // x axis
+  const xScale = d3.scaleTime()
+    .domain(d3.extent(data, d => d['date']))
+    .range([0, innerWidth]);
+
+  const xAxis = d3.axisBottom(xScale)
+    .tickSize(innerHeight)
     .tickPadding(10);
 
   g.append('g')
@@ -92,140 +62,183 @@ const render = () => {
     .selectAll('.domain')
     .remove();
 
-  const rankScale = d3.scaleBand()
-    .range([0, innerHeight])
-    .domain(Array.from(Array(data.length).keys()))
-    .padding(0.05);
+  g.append('text')
+    .text('Time(year)')
+    .attr('text-anchor', 'middle')
+    .attr('x', innerWidth / 2)
+    .attr('y', innerHeight + 40)
 
-  const rankAxis = g.append('g')
-    .attr('transform', `translate(${innerWidth},0)`)
-  rankAxis.call(d3.axisRight(rankScale).tickFormat(d => '# ' + (d + 1)))
-  rankAxis.selectAll('.domain').remove();
+  // y axis
+  const yScale = d3.scaleLinear()
+    .domain([-2500000, 2500000])
+    .range([innerHeight, 0]);
 
-  const yScale = d3.scaleBand()
-    .range([innerHeight, 0])
-    .domain(schools)
-    .padding(0.05);
+  const yAxis = d3.axisLeft(yScale)
+    .tickSize(-innerWidth)
+    .tickPadding(10);
 
-  const yAxis = g.append('g')
-  yScale.domain(schools);
-  yAxis.transition()
-    .duration(1000)
-    .call(d3.axisLeft(yScale)
-      .tickFormat(d => strmap[d]));
-  yAxis.selectAll('.domain').remove();
+  g.append('g')
+    .call(yAxis)
+    .selectAll('.domain')
+    .remove();
 
-  const tooltipInfo = (name) => {
-    const d = name2row[name];
-    let info = d['name'] + '<br>';
-    info += 'overall：' + d['scores_overall'];
-    return info;
-  }
+  // stack the data
+  let stackedData = d3.stack()
+    .offset(d3.stackOffsetSilhouette)
+    .keys(columns)
+    (data);
 
-  yAxis.selectAll('text')
-    .on('mouseover', function (d) {
-      tooltip
-        .html(`${tooltipInfo(strmap[d3.select(this).text()])}`)
-        .style('opacity', 1)
-    })
-    .on('mouseleave', function (d) {
-      tooltip.style('opacity', 0)
-    })
+  // generate area
+  const area = d3.area()
+    .x(d => xScale(d.data.date))
+    .y0(d => yScale(d[0]))
+    .y1(d => yScale(d[1]));
 
-  const rectInfo = (name, field) => {
-    const d = name2row[name];
-    let info = d['name'] + '<br>';
-    info += columnShort[field] + '：' + d[field] + ' * ' + weight[field] + ' = ' + d[field] * weight[field];
-    return info;
-  }
+  // get mouse position relative to the plot
+  let mouseX = 0;
+  g.on('mousemove', function (d) {
+    mouseX = d3.mouse(g.node())[0];
+    tooltip.html(tooltipInfo());
+  })
 
-  function drawRect(xOffset, school, field) {
-    g.append('rect')
-      .attr('x', xOffset)
-      .attr('y', yScale(school['name']) + 5)
-      .attr('width', xScale(school[field]) * weight[field])
-      .attr('height', yScale.bandwidth() - 10)
-      .style('fill', color(field))
-      .on('mouseover', function (d) {
-        d3.select(this)
-          .raise()
-          .style('stroke', 'black')
-          .style('stroke-width', '2px')
-        tooltip
-          .html(`${rectInfo(school['name'], field)}`)
-          .style('opacity', 1)
-      })
-      .on('mouseleave', function (d) {
-        d3.select(this)
-          .style('opacity', 1)
-          .style('stroke', 'none')
-        tooltip.style('opacity', 0)
-      })
-
-    xOffset += xScale(school[field]) * weight[field]
-    return xOffset
-  }
-
-  for (i in data) {
-    let offset = 0;
-    for (j in columns) {
-      offset = drawRect(offset, data[i], columns[j])
-    }
-  }
-
-  function update() {
-    sort();
-    yScale.domain(schools);
-    yAxis.transition()
-      .duration(1000)
-      .call(d3.axisLeft(yScale)
-        .tickFormat(d => strmap[d]));
-    yAxis.selectAll('.domain').remove();
-
-    g.selectAll('rect').remove();
-
-    for (i in data) {
-      let offset = 0;
-      for (j in columns) {
-        offset = drawRect(offset, data[i], columns[j])
+  // generate tooltip info
+  const tooltipInfo = () => {
+    let minDate = dates[0];
+    let minVal = Math.abs(mouseX - xScale(minDate));
+    for (let i = 1; i < dates.length; i++) {
+      if (minVal > Math.abs(mouseX - xScale(dates[i]))) {
+        minVal = Math.abs(mouseX - xScale(dates[i]));
+        minDate = dates[i];
       }
     }
-
+    let info = `<strong>${key}</strong><br>`;
+    info += `date : ${minDate.toLocaleDateString('en-US')}<br>`;
+    info += `MA : ${obj[minDate][key]}`;
+    return info;
   }
 
-  $("input[name='inlineRadioOptions']").click(function () {
-    label = $("input[name='inlineRadioOptions']:checked").val();
-    if (label != 'scores_overall') {
-      const idx = columns.indexOf(label);
-      const temp = columns[idx];
-      columns[idx] = columns[0];
-      columns[0] = temp;
-    }
-    update();
-  });
+  // draw theme rivers
+  const rivers = g.selectAll("mylayers")
+    .data(stackedData)
+    .enter()
+    .append("path")
+    .attr("class", "river")
+    .style("fill", d => color(d.key))
+    .attr("d", area)
+    .on("mouseover", function (d) {
+      key = d.key
+      tooltip.style('opacity', 1);
+      d3.selectAll('.river')
+        .style('opacity', 0.2);
+      d3.select(this)
+        .style('stroke-width', '2px')
+        .style('stroke', 'black')
+        .style('opacity', 1);
+    })
+    .on("mouseleave", function (d) {
+      tooltip.style('opacity', 0);
+      d3.selectAll('.river')
+        .style('opacity', 1);
+      d3.select(this)
+        .style('stroke', 'none');
+    })
+
+  // legends
+  let dragging = {}
+  const position = (d) => {
+    return dragging[d] == null ? 200 - columns.indexOf(d) * 25 : dragging[d];
+  }
+
+  const drag = d3.drag();
+
+  // legends
+  const dots = g.selectAll("mydots")
+    .data(columns)
+    .enter()
+    .append("circle")
+    .attr("cx", innerWidth + 20)
+    .attr("cy", d => position(d))
+    .attr("r", 7)
+    .style("fill", d => color(d))
+    .call(drag)
+  const labels = g.selectAll("mylabels")
+    .data(columns)
+    .enter()
+    .append("text")
+    .attr("x", innerWidth + 40)
+    .attr("y", d => position(d))
+    .text(function (d) { return d })
+    .attr("text-anchor", "left")
+    .style("alignment-baseline", "middle")
+    .call(drag)
+
+  // update the chart
+  function update() {
+    dots.data(columns)
+      .attr('cy', d => position(d))
+      .style("fill", function (d) { return color(d) });
+    labels.data(columns)
+      .text(d => d)
+      .attr("y", d => position(d))
+    stackedData = d3.stack()
+      .offset(d3.stackOffsetSilhouette)
+      .keys(columns)
+      (data);
+    rivers.data(stackedData)
+      .transition()
+      .duration(300)
+      .style("fill", d => color(d.key))
+      .attr("d", area)
+  }
+
+  // drag legends
+  drag
+    .on('drag', function (d) {
+      console.log(d)
+      d3.select(this).attr("cy", d3.event.y);
+      dragging[d] = d3.event.y;
+      columns.sort((a, b) => position(b) - position(a));
+      update();
+    })
+    .on('end', function (d) {
+      console.log('end')
+      delete dragging[d];
+      update();
+    });
 };
 
+// convert mm/dd/yyyy to Date
+const getDate = (s) => {
+  const nums = s.split('/');
+  return new Date(nums[2], nums[1], nums[0]);
+}
+
 // load data
-d3.csv('http://vis.lab.djosix.com:2023/data/TIMES_WorldUniversityRankings_2024.csv')
+d3.csv('http://vis.lab.djosix.com:2023/data/ma_lga_12345.csv')
   .then(csv => {
     csv.forEach(row => {
-      if (row['rank'] == 'Reporter') return;
-      row['scores_overall'] = 0
-      columns.forEach(c => {
-        row[c] = +row[c];
-        row['scores_overall'] += row[c] * weight[c];
-      })
-      data.push(row);
-      if (row['name'].length > 30) {
-        strmap[row['name'].slice(0, 30) + '...'] = row['name'];
-        strmap[row['name']] = row['name'].slice(0, 30) + '...';
+      const date = getDate(row['saledate']);
+      if (!(date in obj)) {
+        dates.push(date);
+        obj[date] = {
+          'date': null,
+          'house': 0,
+          'unit': 0,
+          '1 bedrooms': 0,
+          '2 bedrooms': 0,
+          '3 bedrooms': 0,
+          '4 bedrooms': 0,
+          '5 bedrooms': 0,
+        }
       }
-      else {
-        strmap[row['name']] = row['name'];
-      }
-      name2row[row['name']] = row;
+      obj[date]['date'] = date
+      obj[date][row['bedrooms'] + ' bedrooms'] = +row['MA'];
+      obj[date][row['type']] = +row['MA'];
     })
-    sort();
+    data = Object.values(obj)
+    data.sort((a, b) => {
+      return a['date'] - b['date']
+    })
     render();
   });
 
