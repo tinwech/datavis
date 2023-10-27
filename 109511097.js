@@ -1,13 +1,19 @@
-let data = []
-let dates = []
-let obj = {}
-let key = 'house'
+let data
+let loading = true
+
+let timeRange = [new Date('2017'), new Date('2018')]
+let band = 3
+let groupType = 'station'
 
 const svg = d3.select('svg');
-const columns = ['house', 'unit', '1 bedrooms', '2 bedrooms', '3 bedrooms', '4 bedrooms', '5 bedrooms']
+let stations = ['Jongno-gu', 'Jung-gu', 'Yongsan-gu', 'Eunpyeong-gu', 'Seodaemun-gu', 'Mapo-gu', 'Seongdong-gu', 'Gwangjin-gu', 'Dongdaemun-gu', 'Jungnang-gu', 'Seongbuk-gu', 'Gangbuk-gu', 'Dobong-gu', 'Nowon-gu', 'Yangcheon-gu', 'Gangseo-gu', 'Guro-gu', 'Geumcheon-gu', 'Yeongdeungpo-gu', 'Dongjak-gu', 'Gwanak-gu', 'Seocho-gu', 'Gangnam-gu', 'Songpa-gu', 'Gangdong-gu']
+let show = {}
+stations.forEach(s => show[s] = true)
+let columns = ['SO2', 'NO2', 'O3', 'CO', 'PM10', 'PM2.5']
+columns.forEach(c => show[c] = true)
 const color = d3.scaleOrdinal()
   .domain(columns)
-  .range(d3.schemePaired)
+  .range(d3.schemeCategory10)
 
 const tooltip = d3.select("#plot")
   .append("div")
@@ -22,9 +28,13 @@ const tooltip = d3.select("#plot")
   .style('width', 'auto');
 
 svg.on('mousemove', function (d) {
+  left = d3.mouse(svg.node())[0] + 50
+  if (left > 300) {
+    left -= 300;
+  }
   tooltip
-    .style("left", (d3.mouse(svg.node())[0] + 50) + "px")
-    .style("top", (d3.mouse(svg.node())[1] - 550) + "px")
+    .style("left", (left) + "px")
+    .style("top", (d3.mouse(svg.node())[1] - 5100) + "px")
 })
 
 const render = () => {
@@ -32,214 +42,315 @@ const render = () => {
 
   const plot = d3.select('#plot').node();
   const width = plot.getBoundingClientRect().width;
-  const height = 500;
+  const height = 5000;
 
-  const margin = { top: 30, right: 200, bottom: 80, left: 150 };
+  const margin = { top: 60, right: 50, bottom: 80, left: 0 };
   const innerWidth = width - margin.left - margin.right;
   const innerHeight = height - margin.top - margin.bottom;
 
   const g = svg.append('g')
     .attr('transform', `translate(${margin.left},${margin.top})`);
 
-  // background
-  g.append('rect')
-    .attr('id', 'background')
-    .attr('width', innerWidth)
-    .attr('height', innerHeight)
-    .attr('fill', '#EFECEA');
+  if (loading) {
+    return;
+  }
+
+  d3.select('.sbl-circ').style('display', 'none');
+
+  const subWidth = innerWidth
+  const subHeight = 30
+  const pad = 1;
 
   // x axis
   const xScale = d3.scaleTime()
-    .domain(d3.extent(data, d => d['date']))
-    .range([0, innerWidth]);
-
-  const xAxis = d3.axisBottom(xScale)
-    .tickSize(innerHeight)
+    .domain(timeRange)
+    .range([0, subWidth])
+  const xAxis = d3.axisTop(xScale)
+    .tickFormat(d => d3.timeFormat("%Y/%m")(d))
+    .ticks(5)
     .tickPadding(10);
-
   g.append('g')
     .call(xAxis)
-    .selectAll('.domain')
-    .remove();
+    .attr('id', 'x-axis');
 
-  g.append('text')
-    .text('Time(year)')
-    .attr('text-anchor', 'middle')
-    .attr('x', innerWidth / 2)
-    .attr('y', innerHeight + 40)
 
-  // y axis
-  const yScale = d3.scaleLinear()
-    .domain([-2500000, 2500000])
-    .range([innerHeight, 0]);
-
-  const yAxis = d3.axisLeft(yScale)
-    .tickSize(-innerWidth)
-    .tickPadding(10);
-
-  g.append('g')
-    .call(yAxis)
-    .selectAll('.domain')
-    .remove();
-
-  // stack the data
-  let stackedData = d3.stack()
-    .offset(d3.stackOffsetSilhouette)
-    .keys(columns)
-    (data);
-
-  // generate area
-  const area = d3.area()
-    .x(d => xScale(d.data.date))
-    .y0(d => yScale(d[0]))
-    .y1(d => yScale(d[1]));
-
-  // get mouse position relative to the plot
-  let mouseX = 0;
-  g.on('mousemove', function (d) {
-    mouseX = d3.mouse(g.node())[0];
-    tooltip.html(tooltipInfo());
-  })
-
-  // generate tooltip info
-  const tooltipInfo = () => {
-    let minDate = dates[0];
-    let minVal = Math.abs(mouseX - xScale(minDate));
-    for (let i = 1; i < dates.length; i++) {
-      if (minVal > Math.abs(mouseX - xScale(dates[i]))) {
-        minVal = Math.abs(mouseX - xScale(dates[i]));
-        minDate = dates[i];
+  // set position of each horizon plot
+  let idx;
+  let ypos = {}
+  idx = 0;
+  if (groupType == 'station') {
+    for (let i = 0; i < stations.length; i++) {
+      for (let j = 0; j < columns.length; j++) {
+        if (!show[stations[i]] || !show[columns[j]]) continue;
+        ypos[stations[i] + columns[j]] = idx * (subHeight + pad);
+        idx++;
       }
     }
-    let info = `<strong>${key}</strong><br>`;
-    info += `date : ${minDate.toLocaleDateString('en-US')}<br>`;
-    info += `MA : ${obj[minDate][key]}`;
-    return info;
+  }
+  else {
+    for (let i = 0; i < columns.length; i++) {
+      for (let j = 0; j < stations.length; j++) {
+        if (!show[stations[j]] || !show[columns[i]]) continue;
+        ypos[stations[j] + columns[i]] = idx * (subHeight + pad);
+        idx++;
+      }
+    }
+
   }
 
-  // draw theme rivers
-  const rivers = g.selectAll("mylayers")
-    .data(stackedData)
-    .enter()
-    .append("path")
-    .attr("class", "river")
-    .style("fill", d => color(d.key))
-    .attr("d", area)
-    .on("mouseover", function (d) {
-      key = d.key
-      tooltip.style('opacity', 1);
-      d3.selectAll('.river')
-        .style('opacity', 0.2);
-      d3.select(this)
-        .style('stroke-width', '2px')
-        .style('stroke', 'black')
-        .style('opacity', 1);
-    })
-    .on("mouseleave", function (d) {
-      tooltip.style('opacity', 0);
-      d3.selectAll('.river')
-        .style('opacity', 1);
-      d3.select(this)
-        .style('stroke', 'none');
-    })
+  // group the data base on station
+  const groups = data.reduce((groups, d) => {
+    const group = (groups[d.Address] || []);
+    group.push(d);
+    groups[d.Address] = group;
+    return groups;
+  }, {});
 
-  // legends
-  let dragging = {}
-  const position = (d) => {
-    return dragging[d] == null ? 200 - columns.indexOf(d) * 25 : dragging[d];
+
+  // draw horizon plot
+  idx = 0;
+  for (let i = 0; i < stations.length; i++) {
+    const series = groups[stations[i]];
+    for (let j = 0; j < columns.length; j++) {
+      if (!show[stations[i]] || !show[columns[j]]) continue;
+
+      // clip the drawing out of this range
+      const clip = g.append("defs").append("svg:clipPath")
+        .attr("id", "clip" + idx)
+        .append("svg:rect")
+        .attr("width", subWidth)
+        .attr("height", subHeight)
+        .attr("x", 0)
+        .attr("y", 0);
+
+      // subplot
+      const plot = g.append('g')
+        .attr('transform', `translate(0,${ypos[stations[i] + columns[j]]})`)
+        .attr('clip-path', `url(#clip${idx})`)
+
+
+      // get the maximum value
+      const max = d3.max(series, d => d[columns[j]])
+
+      // y axis
+      const yScale = d3.scaleLinear()
+        .domain([0, max])
+        .range([subHeight, 0])
+
+      // draw area for each band
+      for (let k = 0; k < band; k++) {
+        plot.append("path")
+          .datum(series)
+          .attr("id", "path" + k)
+          .attr("fill", color(columns[j]))
+          .style("opacity", 1 / band)
+          .attr("stroke", color(columns[j]))
+          .attr("stroke-width", 1.5)
+          .attr("d", d3.area()
+            .x(d => xScale(d.date))
+            .y0(subHeight)
+            .y1(d => yScale(Math.max(0, d[columns[j]] * band - max * k)))
+          )
+      }
+
+      plot.append('text')
+        .text(`${columns[j]}, ${stations[i]}`)
+        .style('font-size', '0.8em')
+        .attr('transform', `translate(5,20)`);
+
+      // tooltip
+      plot.append('rect')
+        .attr("width", subWidth)
+        .attr("height", subHeight)
+        .style("opacity", 0)
+        .on("mouseover", function (d) {
+          tooltip.style('opacity', 1);
+          let mouseX = d3.mouse(plot.node())[0];
+          plot.append('line')
+            .attr('x1', mouseX)
+            .attr('x2', mouseX)
+            .attr('y1', 0)
+            .attr('y2', subHeight)
+            .style('stroke-width', '2px')
+            .style('stroke', 'black');
+          d3.select(this).raise();
+        })
+        .on("mouseleave", function (d) {
+          d3.selectAll('line').remove();
+          tooltip.style('opacity', 0);
+        })
+        .on("mousemove", function (d) {
+          let mouseX = d3.mouse(plot.node())[0];
+          d3.select('line')
+            .attr('x1', mouseX)
+            .attr('x2', mouseX);
+          tooltip.html(() => {
+            let minDate = new Date();
+            let minVal = Math.abs(mouseX - xScale(minDate));
+            let val;
+            for (let i = 1; i < series.length; i++) {
+              if (minVal > Math.abs(mouseX - xScale(series[i].date))) {
+                minVal = Math.abs(mouseX - xScale(series[i].date));
+                minDate = series[i].date
+                val = series[i][columns[j]]
+              }
+            }
+            info = `${d3.timeFormat("%Y/%m/%d")(minDate)}<br>`
+            info += `Station: ${stations[i]}<br>`
+            info += `${columns[j]}: ${val}<br>`
+            return info;
+          });
+        })
+
+      idx++;
+    }
   }
 
-  const drag = d3.drag();
-
-  // legends
-  const dots = g.selectAll("mydots")
-    .data(columns)
-    .enter()
-    .append("circle")
-    .attr("cx", innerWidth + 20)
-    .attr("cy", d => position(d))
-    .attr("r", 7)
-    .style("fill", d => color(d))
-    .call(drag)
-  const labels = g.selectAll("mylabels")
-    .data(columns)
-    .enter()
-    .append("text")
-    .attr("x", innerWidth + 40)
-    .attr("y", d => position(d))
-    .text(function (d) { return d })
-    .attr("text-anchor", "left")
-    .style("alignment-baseline", "middle")
-    .call(drag)
-
-  // update the chart
-  function update() {
-    dots.data(columns)
-      .attr('cy', d => position(d))
-      .style("fill", function (d) { return color(d) });
-    labels.data(columns)
-      .text(d => d)
-      .attr("y", d => position(d))
-    stackedData = d3.stack()
-      .offset(d3.stackOffsetSilhouette)
-      .keys(columns)
-      (data);
-    rivers.data(stackedData)
-      .transition()
-      .duration(300)
-      .style("fill", d => color(d.key))
-      .attr("d", area)
-  }
-
-  // drag legends
-  drag
-    .on('drag', function (d) {
-      console.log(d)
-      d3.select(this).attr("cy", d3.event.y);
-      dragging[d] = d3.event.y;
-      columns.sort((a, b) => position(b) - position(a));
-      update();
-    })
-    .on('end', function (d) {
-      console.log('end')
-      delete dragging[d];
-      update();
-    });
 };
 
 // convert mm/dd/yyyy to Date
 const getDate = (s) => {
-  const nums = s.split('/');
-  return new Date(nums[2], nums[1], nums[0]);
+  const date = s.split(' ');
+  return new Date(date[0]);
 }
 
+render();
+
 // load data
-d3.csv('http://vis.lab.djosix.com:2023/data/ma_lga_12345.csv')
+console.time();
+d3.csv('http://vis.lab.djosix.com:2023/data/air-pollution.csv')
+  // d3.csv('./air-pollution.csv')
   .then(csv => {
+    loading = true;
     csv.forEach(row => {
-      const date = getDate(row['saledate']);
-      if (!(date in obj)) {
-        dates.push(date);
-        obj[date] = {
-          'date': null,
-          'house': 0,
-          'unit': 0,
-          '1 bedrooms': 0,
-          '2 bedrooms': 0,
-          '3 bedrooms': 0,
-          '4 bedrooms': 0,
-          '5 bedrooms': 0,
-        }
-      }
-      obj[date]['date'] = date
-      obj[date][row['bedrooms'] + ' bedrooms'] = +row['MA'];
-      obj[date][row['type']] = +row['MA'];
+      row['date'] = getDate(row['Measurement date']);
+      row['Address'] = row['Address'].split(',')[2].trim()
+      row['SO2'] = +row['SO2'];
+      row['NO2'] = +row['NO2'];
+      row['O3'] = +row['O3'];
+      row['CO'] = +row['CO'];
+      row['PM10'] = +row['PM10'];
+      row['PM2.5'] = +row['PM2.5'];
     })
-    data = Object.values(obj)
-    data.sort((a, b) => {
-      return a['date'] - b['date']
-    })
+    // TODO: avg or mean
+    data = alasql('select * from ? where SO2 > 0 and NO2 > 0 and O3 > 0 and CO > 0 and PM10 > 10 and [PM2.5] > 0', [csv]);
+    data = alasql('select date, Address, AVG(SO2) as SO2, AVG(NO2) as NO2, AVG(O3) as O3, AVG(CO) as CO, AVG(PM10) as PM10, AVG([PM2.5]) as [PM2.5] from ? group by date, Address', [data]);
+    loading = false;
+    console.log(data);
+    console.timeEnd();
     render();
   });
 
 window.onresize = () => { render() }
+
+
+function timestamp(str) {
+  return new Date(str).getTime();
+}
+
+var timeSlider = document.getElementById('slider-time');
+noUiSlider.create(timeSlider, {
+  connect: true,
+  range: {
+    min: timestamp('2017'),
+    max: timestamp('2020')
+  },
+  step: 24 * 60 * 60 * 1000,
+  margin: 30 * 24 * 60 * 60 * 1000,
+  start: [timestamp('2017'), timestamp('2018')],
+});
+
+var dateValues = [
+  document.getElementById('event-start'),
+  document.getElementById('event-end')
+];
+
+var formatter = new Intl.DateTimeFormat('en-GB', {
+  dateStyle: 'full'
+});
+
+timeSlider.noUiSlider.on('update', function (values, handle) {
+  timeRange[handle] = new Date(+values[handle]);
+  dateValues[handle].innerHTML = d3.timeFormat("%Y/%m/%d")(new Date(+values[handle]));
+});
+
+timeSlider.noUiSlider.on('set', function (values, handle) {
+  d3.select('.sbl-circ').style('display', 'inline-block');
+  render();
+})
+
+var bandSlider = document.getElementById('slider-band');
+noUiSlider.create(bandSlider, {
+  start: 3,
+  connect: [true, false],
+  range: {
+    'min': 1,
+    'max': 7
+  },
+  step: 1,
+});
+
+bandSlider.noUiSlider.on('update', function (values, handle) {
+  bandValue = document.getElementById('event-band');
+  bandValue.innerHTML = Math.round(values[handle]);
+});
+
+bandSlider.noUiSlider.on('set', function (values, handle) {
+  band = Math.round(values[handle]);
+  render();
+})
+
+let htmlStr = `<div class="form-check">
+                <input class="form-check-input" type="checkbox" id="check-all-station" checked>
+                <label class="form-check-label" for="check-all-station">
+                  Select all
+                </label>
+              </div>`
+for (i in stations) {
+  htmlStr += `<div class="form-check">
+                <input class="form-check-input station-checkbox" type="checkbox" value="${stations[i]}" id="check-${stations[i]}" checked onchange="updateCheckbox(value)">
+                <label class="form-check-label" for="check-${stations[i]}">
+                  ${stations[i]}
+                </label>
+              </div>`
+}
+document.getElementById('stationsList').innerHTML = htmlStr;
+$('#check-all-station').click(function () {
+  const status = $(this).prop('checked');
+  $(".form-check-input.station-checkbox").prop('checked', status);
+  stations.forEach(s => show[s] = status);
+  render();
+})
+
+htmlStr = `<div class="form-check">
+                <input class="form-check-input" type="checkbox" id="check-all-pollutant" checked>
+                <label class="form-check-label" for="check-all-pollutant">
+                  Select all
+                </label>
+              </div>`
+for (i in columns) {
+  htmlStr += `<div class="form-check">
+                <input class="form-check-input pollutant-checkbox" type="checkbox" value="${columns[i]}" id="check-${columns[i]}" checked onchange="updateCheckbox(value)">
+                <label class="form-check-label" for="check-${columns[i]}">
+                  ${columns[i]}
+                </label>
+              </div>`
+}
+document.getElementById('pollutantsList').innerHTML = htmlStr;
+$('#check-all-pollutant').click(function () {
+  const status = $(this).prop('checked');
+  $(".form-check-input.pollutant-checkbox").prop('checked', status);
+  columns.forEach(s => show[s] = status);
+  render();
+})
+
+function updateCheckbox(key) {
+  show[key] = !show[key];
+  render();
+}
+
+function updateRadio(value) {
+  groupType = value;
+  render();
+}
+
