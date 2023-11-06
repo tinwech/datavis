@@ -1,6 +1,6 @@
-# Homework 6: ThemeRiver
+# Homework 8: Sankey Diagram
 
 ## User guide
 
-- Hover on a specific section of the streams to show tooltip
-- Drag the legends to reorder the steams
+- The nodes can be dragged vertically
+- Drag the attribute labels horizontally to reorder the nodes
