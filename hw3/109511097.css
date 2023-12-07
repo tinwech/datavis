@@ -1,0 +1,33 @@
+body {
+  margin: 0px;
+}
+
+circle {
+  opacity: 0.3;
+}
+
+text {
+  font-family: sans-serif;
+}
+
+.navbar-brand {
+  font-size: 2em !important;
+}
+
+.tick text {
+  font-size: 1em;
+  fill: #635F5D;
+}
+
+.tick line {
+  stroke: #C0C0BB;
+}
+
+.domain {
+  stroke: #C0C0BB;
+}
+
+.axis-label {
+  font-size: 2em;
+  fill: #8E8883;
+}
