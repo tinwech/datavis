@@ -15,7 +15,7 @@ const render = () => {
 };
 
 // load data
-d3.csv('http://vis.lab.djosix.com:2023/data/spotify_tracks.csv', function (error, csv) {
+d3.csv('https://tinwech.github.io/datavis/data/spotify_tracks.csv', function (error, csv) {
   csv = csv.filter(d => {
     columns.forEach(c => {
       if (!isNaN(+d[c])) {

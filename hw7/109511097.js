@@ -218,7 +218,7 @@ render();
 
 // load data
 console.time();
-d3.csv('http://vis.lab.djosix.com:2023/data/air-pollution.csv')
+d3.csv('https://tinwech.github.io/datavis/data/air-pollution.csv')
   // d3.csv('./air-pollution.csv')
   .then(csv => {
     loading = true;

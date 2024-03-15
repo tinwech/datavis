@@ -217,7 +217,7 @@ const render = () => {
 };
 
 // load data
-d3.csv('http://vis.lab.djosix.com:2023/data/TIMES_WorldUniversityRankings_2024.csv')
+d3.csv('https://tinwech.github.io/datavis/data/TIMES_WorldUniversityRankings_2024.csv')
   .then(csv => {
     csv.forEach(row => {
       if (row['rank'] == 'Reporter') return;

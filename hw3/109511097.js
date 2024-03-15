@@ -342,7 +342,7 @@ const render = () => {
 };
 
 // load data
-d3.text('http://vis.lab.djosix.com:2023/data/abalone.data')
+d3.text('https://tinwech.github.io/datavis/data/abalone.data')
   .then(text => {
     const csv = d3.csvParseRows(text);
     for (const row of csv) {

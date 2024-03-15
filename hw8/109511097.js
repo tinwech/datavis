@@ -306,7 +306,7 @@ function buildGraph(data) {
 }
 
 // load data
-d3.text('http://vis.lab.djosix.com:2023/data/car.data', function (error, text) {
+d3.text('https://tinwech.github.io/datavis/data/car.data', function (error, text) {
   const csv = d3.csvParseRows(text);
   csv.forEach(row => {
     data.push({

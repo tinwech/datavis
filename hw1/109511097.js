@@ -163,7 +163,7 @@ const render = () => {
 };
 
 // load data
-d3.csv('http://vis.lab.djosix.com:2023/data/iris.csv')
+d3.csv('https://tinwech.github.io/datavis/data/iris.csv')
   .then(csv => {
     data = csv.filter(d => {
       if (d.class !== undefined) {

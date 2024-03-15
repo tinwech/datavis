@@ -220,7 +220,7 @@ const getDate = (s) => {
 }
 
 // load data
-d3.csv('http://vis.lab.djosix.com:2023/data/ma_lga_12345.csv')
+d3.csv('https://tinwech.github.io/datavis/data/ma_lga_12345.csv')
   .then(csv => {
     csv.forEach(row => {
       const date = getDate(row['saledate']);
